@@ -1,5 +1,6 @@
-pyttsx3
 fastapi
 uvicorn
-python-espeak
+pyttsx3
+pydantic
+
 # (.txttoaud_env) macbook@Apples-MacBook-Pro texttoaudio_deploy % /Users/macbook/Desktop/texttoaudio_deploy/.txttoaud_env/bin/python -c "import pyttsx3; print('pyttsx3 is installed!')"
