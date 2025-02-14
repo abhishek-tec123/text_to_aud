@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 import pyttsx3
+import uvicorn
 
 app = FastAPI()
 
@@ -40,3 +41,6 @@ async def list_voices():
     engine = pyttsx3.init()
     voices = engine.getProperty('voices')
     return [{"index": i, "name": voice.name, "id": voice.id} for i, voice in enumerate(voices)]
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=3000)
