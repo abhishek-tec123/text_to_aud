@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Viewer and Chat</title>
+    <style>
+        /* Base styles */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh; /* Full screen height */
+            transition: background-color 0.3s, color 0.3s; /* Smooth transition for background and text colors */
+            background-color: #181818;
+            color: #ddd;
+        }
+    
+        header {
+            width: 100%;
+            padding: 10px;
+            background-color: #333;
+            color: white;
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 20px; /* Space between header and content */
+        }
+    
+        .container {
+            display: flex;
+            flex-direction: column; /* Stack the elements vertically */
+            align-items: center; /* Center horizontally */
+            justify-content: flex-start; /* Start stacking from top */
+            padding: 20px;
+            width: 80%; /* Limit width */
+            max-width: 900px; /* Max width */
+        }
+    
+        .box {
+            width: 100%;
+            border: 1px solid #444;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px; /* Space between boxes */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            background-color: #222;
+            transition: background-color 0.3s, box-shadow 0.3s; /* Smooth transitions */
+        }
+    
+        .box h2 {
+            font-size: 18px;
+            margin-top: 0;
+        }
+    
+        .textarea-container {
+            margin-top: 10px;
+        }
+    
+        .textarea-container textarea {
+            width: 100%;
+            height: 60px;
+            border-radius: 5px;
+            border: 1px solid #555;
+            resize: none;
+            background-color: #333;
+            color: #ddd;
+        }
+    
+        .textarea-container button {
+            margin-top: 10px;
+            padding: 10px 15px;
+            background-color: #444;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+    
+        .textarea-container button:hover {
+            background-color: #555;
+        }
+    
+        .content-box {
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    
+        .content-box pre {
+            margin: 0;
+        }
+    
+        #document-list {
+            display: none; /* Hide the document list by default */
+        }
+    
+        #similar-documents {
+            display: none; /* Initially hide the Similar Documents section */
+        }
+    
+        .toggle-button {
+            background-color: #444;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            padding: 5px 10px;
+            font-size: 14px;
+        }
+    
+        .toggle-button:hover {
+            background-color: #555;
+        }
+    
+        /* No need for light mode styles since it's now always dark */
+    </style>
+    
+</head>
+<body>
+    <div class="container">
+        <!-- Indexed Documents Section -->
+        <div class="box">
+            <h2>Indexed Documents</h2>
+            <button class="toggle-button" onclick="toggleSection('document-list')">Expand/Collapse</button>
+            <div class="content-box" id="document-list">
+                <!-- Indexed documents will appear here -->
+            </div>
+        </div>
+
+        <!-- Chat Prompt Section -->
+        <div class="box">
+            <h2>Prompt</h2>
+            <div class="textarea-container">
+                <textarea id="query-input" placeholder="Enter your question here..."></textarea>
+                <button onclick="submitQuery()">Submit</button>
+            </div>
+            <div id="query-response" style="margin-top: 10px; font-style: italic;"></div>
+        </div>
+
+        <!-- Similar Documents Section -->
+        <div class="box" id="similar-documents">
+            <h2>References</h2>
+            <button class="toggle-button" onclick="toggleSection('similar-documents-list')">Expand/Collapse</button>
+            <div class="content-box" id="similar-documents-list">
+                <!-- Similar documents will appear here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let documents = []; // Store all documents globally
+        let currentPage = 1; // Track the current page
+        const pageSize = 100; // Number of documents per page
+    
+        // Function to load all indexed documents
+        function loadDocuments() {
+            fetch('/documents')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error("Failed to fetch documents.");
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log(data); // Log the received data
+                    documents = data; // Store the fetched documents
+                    currentPage = 1; // Reset to the first page
+                    renderDocuments(); // Render the first set of documents
+                })
+                .catch(error => {
+                    document.getElementById("document-list").textContent = `Error: ${error.message}`;
+                });
+        }
+    
+        // Function to render documents for the current page
+        function renderDocuments() {
+            const documentList = document.getElementById("document-list");
+            documentList.innerHTML = ""; // Clear any existing content
+    
+            const startIndex = (currentPage - 1) * pageSize;
+            const endIndex = Math.min(startIndex + pageSize, documents.length);
+    
+            for (let i = startIndex; i < endIndex; i++) {
+                const doc = documents[i];
+                const docElement = document.createElement("pre");
+    
+                const formattedContent = `
+    <strong>Filename:</strong> ${doc.filename}
+    <strong>Page:</strong> ${doc.page}
+    <strong>Source Index:</strong> ${doc.source_index}
+    
+    <strong>Content:</strong>
+    ${doc.content}
+                `.trim();
+    
+                docElement.innerHTML = formattedContent;
+                documentList.appendChild(docElement);
+            }
+    
+            renderPaginationControls();
+        }
+    
+        // Pagination
+        function renderPaginationControls() {
+            const documentList = document.getElementById("document-list");
+            const paginationContainer = document.createElement("div");
+            paginationContainer.style.marginTop = "10px";
+            paginationContainer.style.textAlign = "center";
+    
+            const prevButton = document.createElement("button");
+            prevButton.textContent = "Previous";
+            prevButton.disabled = currentPage === 1;
+            prevButton.onclick = () => {
+                currentPage--;
+                renderDocuments();
+            };
+            paginationContainer.appendChild(prevButton);
+    
+            const pageInfo = document.createElement("span");
+            pageInfo.textContent = ` Page ${currentPage} of ${Math.ceil(documents.length / pageSize)} `;
+            paginationContainer.appendChild(pageInfo);
+    
+            const nextButton = document.createElement("button");
+            nextButton.textContent = "Next";
+            nextButton.disabled = currentPage === Math.ceil(documents.length / pageSize);
+            nextButton.onclick = () => {
+                currentPage++;
+                renderDocuments();
+            };
+            paginationContainer.appendChild(nextButton);
+    
+            documentList.appendChild(paginationContainer);
+        }
+    
+        // Function to submit query to the API
+        function submitQuery() {
+            const prompt = document.getElementById("query-input").value.trim();
+            if (!prompt) {
+                alert("Please enter a query.");
+                return;
+            }
+    
+            fetch('/query', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ prompt })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Failed to query documents.");
+                }
+                return response.json();
+            })
+            .then(data => {
+                let answer = data.answer;
+    
+                // If similar documents are available, randomly insert them into the answer
+                if (data.context && data.context.length > 0) {
+                    const similarDocuments = data.context;
+    
+                    // Get a random number of documents to show in the answer
+                    const randomCount = Math.min(3, similarDocuments.length); // Show up to 3 documents
+                    const randomDocs = getRandomDocuments(similarDocuments, randomCount);
+    
+                    // Add these document names to the answer
+                    answer += `\n\nRefer to these similar documents for more context:\n- ${randomDocs.join('\n- ')}`;
+                }
+    
+                // Format the answer to handle bold text (wrapped in **)
+                answer = formatAnswerText(answer);
+    
+                document.getElementById("query-response").innerHTML = answer; // Use innerHTML to display formatted text
+    
+                // Render similar documents formatted like indexed documents
+                renderSimilarDocuments(data.context);
+    
+                // Make the Similar Documents section visible
+                document.getElementById("similar-documents").style.display = "block";
+            })
+            .catch(error => {
+                document.getElementById("query-response").textContent = `Error: ${error.message}`;
+    
+                // Hide the Similar Documents section in case of error
+                document.getElementById("similar-documents").style.display = "none";
+            });
+        }
+    
+        // Function to format the answer text: make text between ** bold and preserve line breaks
+        function formatAnswerText(text) {
+            // Replace **bold text** with <strong>bold text</strong>
+            let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+            // Replace new lines with <br> for proper HTML line breaks
+            formattedText = formattedText.replace(/\n/g, '<br>');
+    
+            return formattedText;
+        }
+    
+        // Function to get random documents from the similar documents array
+        function getRandomDocuments(similarDocuments, count) {
+            const shuffled = similarDocuments.sort(() => 0.5 - Math.random()); // Shuffle the array
+            return shuffled.slice(0, count).map(doc => doc.filename || 'Unnamed Document'); // Return filenames
+        }
+    
+        // Function to format and render similar documents
+        function renderSimilarDocuments(similarDocs) {
+            const similarDocsContainer = document.getElementById("similar-documents-list");
+            similarDocsContainer.innerHTML = ""; // Clear any existing similar documents
+    
+            similarDocs.forEach(doc => {
+                const docElement = document.createElement("pre");
+    
+                const formattedContent = `
+    <strong>Filename:</strong> ${doc.filename || 'Unknown'}
+    <strong>Page:</strong> ${doc.page || 'Unknown'}
+    <strong>Source Index:</strong> ${doc.source_index || 'Unknown'}
+    
+    <strong>Content:</strong>
+    ${doc.content || 'No content available'}
+                `.trim();
+    
+                docElement.innerHTML = formattedContent;
+                similarDocsContainer.appendChild(docElement);
+            });
+        }
+    
+        // Function to toggle section visibility
+        function toggleSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            if (section.style.display === "none" || section.style.display === "") {
+                section.style.display = "block";
+            } else {
+                section.style.display = "none";
+            }
+        }
+    
+        // Initial load of documents
+        loadDocuments();
+    </script>
+    
+    
+</body>
+</html>
